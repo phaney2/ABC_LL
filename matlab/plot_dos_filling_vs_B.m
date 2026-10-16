@@ -44,6 +44,18 @@ br = abc_broadening();          % <-- BROADENING: edit abc_broadening.m
 t = abc_dos_tools();
 S = load(datafile);
 
+if ~isfield(S, 'cnp_eV')
+    error('abc:noCNP', ['%s predates the charge-neutrality fix and has no ' ...
+        'cnp_eV field.
+Charge neutrality is NOT at E = 0 (delta and ' ...
+        'gamma4 put it near +6.3 meV at dU = 0), so filling cannot be
+' ...
+        'measured without it. Regenerate with  python3 ' ...
+        'scripts/export_levels.py , or patch the existing file in place ' ...
+        'with
+  python3 scripts/add_cnp_to_mat.py'], datafile);
+end
+
 nu = S.nu(:);  B = S.B_T(:);
 ii = true(size(B));  jj = true(size(nu));
 if ~isempty(B_LIM),  ii = B  >= B_LIM(1)  & B  <= B_LIM(2);  end

@@ -16,6 +16,26 @@ from scipy.io import savemat
 from .params import ABCParams, NPHI_1T
 
 
+def _cnp(du, p):
+    """Charge-neutrality energy for each dU, same shape as ``du``.
+
+    Imported lazily to keep this module free of a hard dependency on the
+    DOS machinery.  Neutrality is **not** at E = 0 -- see `dos.cnp_energy`
+    -- so every export carries it, and the MATLAB side uses it as the
+    reference for filling.
+    """
+    from .dos import cnp_energy
+
+    du = np.asarray(du, float)
+    flat = np.array([cnp_energy(float(x), p) for x in du.ravel()])
+    return flat.reshape(du.shape)
+
+
+CNP_NOTE = (" Charge neutrality is NOT at E = 0: delta and gamma4 shift it to "
+            "about +6.3 meV at dU = 0. cnp_eV holds it, with the same shape "
+            "as the dU grid. Measure filling from cnp_eV, not from zero.")
+
+
 def param_struct(p: ABCParams) -> dict:
     """The tight-binding parameter set, as a MATLAB struct."""
     return {
@@ -67,11 +87,14 @@ def save_dos_map(path, B, du, mu, dos, dos_layer, p, gate, broadening, model):
     nu = gate.density(du)[None, :] / nphi           # (nB, nU)
     total = dos_layer.sum(axis=-1)
 
+    cnp = _cnp(du, p)
     out = {
         "model": model,
         "B_T": B,
         "dU_eV": du,
         "dU_meV": du * 1e3,
+        "cnp_eV": cnp,
+        "cnp_meV": cnp * 1e3,
         "n_m2": gate.density(du),
         "n_cm2": gate.density(du) / 1e4,
         "nu": nu,
@@ -93,7 +116,8 @@ def save_dos_map(path, B, du, mu, dos, dos_layer, p, gate, broadening, model):
             "dU_eV": "eV, total interlayer potential difference u3 - u1",
             "n_m2": "m^-2, carrier density relative to charge neutrality",
             "nu": "Landau filling factor n*h/(e*B), all four flavours",
-            "mu_eV": "eV, chemical potential, zero at charge neutrality",
+            "mu_eV": "eV, chemical potential, absolute (neutrality = cnp_eV)",
+            "cnp_eV": "eV, charge-neutrality energy at each dU -- not zero",
             "dos_m2_eV": "states m^-2 eV^-1, both valleys, spin included",
             "dos_layer_m2_eV": "same, resolved by layer [bottom, middle, top]",
             "top_fraction": "dos_layer(:,:,3) ./ dos, dimensionless",
@@ -107,7 +131,7 @@ def save_dos_map(path, B, du, mu, dos, dos_layer, p, gate, broadening, model):
             "through the origin of the (B, dU) plane. Layers are ordered "
             "[bottom, middle, top]; the top layer sits at u3 = +dU/2. "
             "Index order is (B, dU) and (B, dU, layer). Single-particle, "
-            "no interactions, no moire band folding."),
+            "no interactions, no moire band folding." + CNP_NOTE),
     }
     savemat(str(path), out, do_compression=True)
     return path
@@ -138,12 +162,15 @@ def save_levels_nu(path, B, nu, du2d, levels, layer_weight, valley, p, gate,
             W[i, j, :k, :] = layer_weight[i][j]
             V[i, j, :k] = valley[i][j]
 
+    cnp = _cnp(du2d, p)
     out = {
         "model": model,
         "B_T": B,
         "nu": nu,
         "dU_eV": du2d,
         "dU_meV": np.asarray(du2d) * 1e3,
+        "cnp_eV": cnp,
+        "cnp_meV": cnp * 1e3,
         "nphi_m2": NPHI_1T * B,
         "energy_eV": E,
         "energy_meV": E * 1e3,
@@ -157,7 +184,8 @@ def save_levels_nu(path, B, nu, du2d, levels, layer_weight, valley, p, gate,
             "B_T": "tesla",
             "nu": "Landau filling factor, all four flavours",
             "dU_eV": "eV, (nB x nNu): the dU that gives this nu at this B",
-            "energy_eV": "eV, zero at charge neutrality",
+            "energy_eV": "eV, absolute (neutrality = cnp_eV, not zero)",
+            "cnp_eV": "eV, charge-neutrality energy, (nB x nNu)",
             "n_levels": "valid entries along dim 3 at each (B, nu)",
         },
         "readme": (
@@ -168,7 +196,7 @@ def save_levels_nu(path, B, nu, du2d, levels, layer_weight, valley, p, gate,
             "to the maximum level count; use n_levels. layer_weight is the "
             "fraction on [bottom, middle, top] and valley is +1 for K, -1 for "
             "K'. No broadening is applied here: build the DOS in MATLAB so "
-            "the linewidth stays a free parameter. " + note),
+            "the linewidth stays a free parameter." + CNP_NOTE + " " + note),
     }
     savemat(str(path), out, do_compression=True)
     return path
@@ -199,17 +227,21 @@ def save_levels(path, B, du, levels, layer_weight, p, model, extra=None):
             if W is not None:
                 W[i, j, :k, :] = layer_weight[i][j]
 
+    cnp = _cnp(du, p)
     out = {
         "model": model,
         "B_T": B,
         "dU_eV": du,
         "dU_meV": du * 1e3,
+        "cnp_eV": cnp,
+        "cnp_meV": cnp * 1e3,
         "energy_eV": E,
         "energy_meV": E * 1e3,
         "n_levels": counts,
         "params": param_struct(p),
         "units": {
-            "energy_eV": "eV, zero at charge neutrality",
+            "energy_eV": "eV, absolute (neutrality = cnp_eV, not zero)",
+            "cnp_eV": "eV, charge-neutrality energy at each dU -- not zero",
             "n_levels": "number of valid entries along dim 3 at each (B, dU)",
         },
         "readme": (
@@ -217,7 +249,7 @@ def save_levels(path, B, du, levels, layer_weight, p, model, extra=None):
             "valleys merged and sorted by energy, NaN-padded along the third "
             "dimension to the maximum level count. Use n_levels to find the "
             "valid entries. layer_weight, if present, is the fraction of "
-            "each level on [bottom, middle, top]; rows sum to 1."),
+            "each level on [bottom, middle, top]; rows sum to 1." + CNP_NOTE),
     }
     if W is not None:
         out["layer_weight"] = W

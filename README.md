@@ -27,24 +27,25 @@ cached in `data/`) and `scripts/export_levels.py` (raw levels to .mat).
 
 ## Status
 
-Working and tested (33/33 in `tests/test_validation.py`), with one piece of
-housekeeping outstanding.
+Working and tested: 33/33 in `tests/test_validation.py`.
 
-The charge-neutrality fix (see *Charge neutrality is not at E = 0* below)
-landed after the last full data run, so before trusting the filling axis:
+The export pipeline writes the charge-neutrality energy (`cnp_eV`) itself,
+so a run from a clean checkout needs no extra step:
 
-1. `python3 scripts/dos_map.py` -- regenerate the DOS map and its figures;
-   the cached ones were produced with the old reference and are wrong by up
-   to 1e11 cm^-2 in the strip |dU| < 20 meV.
-2. `python3 scripts/add_cnp_to_mat.py` -- stamp `cnp_eV` into the .mat
-   exports.  `ll_vs_dU.mat`, `ll_grid.mat` and `ll_vs_nu.mat` still need it,
-   and `matlab/plot_dos_filling_vs_B.m` will error until they have it (by
-   design -- it refuses to silently assume neutrality is at zero).
+```
+python3 tests/test_validation.py      # 33 tests
+python3 scripts/compare_models.py     # model-error tables
+python3 scripts/plot_spectra.py       # Landau fans
+python3 scripts/dos_map.py            # DOS map + .mat   (~35 min, cached)
+python3 scripts/export_levels.py      # raw levels -> .mat (~40 min, cached)
+```
 
-Nothing else is affected: the Landau levels themselves, the model-comparison
-tables and `matlab/plot_dos_energy_vs_B.m` do not depend on the neutrality
-reference.
+`data/` and `figures/` are gitignored -- large (one export is 75 MB) and
+fully reproducible from the above.
 
+`scripts/add_cnp_to_mat.py` is a repair utility only.  It patches `cnp_eV`
+into `.mat` files produced *before* that fix; files written by the current
+code already carry it.
 
 ## Conventions
 

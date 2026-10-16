@@ -37,12 +37,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from abc_ll import dos, matio, plotstyle  # noqa: E402
 from abc_ll.params import DEFAULT as P, NPHI_1T  # noqa: E402
 
+#: The parameter set must match the model: the minimal models have
+#: delta = gamma4 = 0, and pairing them with the full set would give the
+#: wrong charge-neutrality reference.
+if os.environ.get("MODEL", "six_band").endswith("minimal"):
+    P = P.minimal()
+
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIGDIR = os.path.join(HERE, "figures")
 CACHE = os.path.join(HERE, "data")
 MEV = 1e3
 
-MODEL = "six_band"
+MODEL = os.environ.get("MODEL", "six_band")
 GATE = dos.moire_gate()                      # 4 states / 9.45 nm cell at 0.2 eV
 #: Gaussian, not Lorentzian: a Lorentzian's 1/E^2 tails make the in-gap DOS --
 #: which is exactly what the fan minima are -- depend on how many distant
@@ -234,15 +240,16 @@ if __name__ == "__main__":
     plotstyle.apply()
     nB = int(os.environ.get("NB", 180))
     nU = int(os.environ.get("NU", 300))
-    B = np.linspace(1.0, 15.0, nB)
+    B = np.linspace(float(os.environ.get("BMIN", 1.0)),
+                    float(os.environ.get("BMAX", 15.0)), nB)
     du = np.linspace(-0.20, 0.20, nU)
     print(f"grid {nB} x {nU}   model={MODEL}   broadening={BROAD.lineshape}")
-    mu, d, dl = compute(B, du, cache=os.path.join(CACHE, f"dos_pm_{nB}x{nU}.npz"))
+    mu, d, dl = compute(B, du, cache=os.path.join(CACHE, f"dos_{MODEL}_{nB}x{nU}.npz"))
     bad = int(np.sum(~np.isfinite(d)))
     print(f"  {bad} failed points" if bad else "  all points converged")
     fig_map(B, du, d, mu, dl)
     fig_cuts(B, du, d, mu, dl)
     print("figures written")
-    mat = os.path.join(CACHE, f"dos_map_{nB}x{nU}.mat")
+    mat = os.path.join(CACHE, f"dos_map_{MODEL}_{nB}x{nU}.mat")
     matio.save_dos_map(mat, B, du, mu, d, dl, P, GATE, BROAD, MODEL)
     print(f"wrote {mat}")

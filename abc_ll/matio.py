@@ -83,8 +83,15 @@ def save_dos_map(path, B, du, mu, dos, dos_layer, p, gate, broadening, model):
     B = np.asarray(B, float)
     du = np.asarray(du, float)
     dos_layer = np.asarray(dos_layer, float)
+    from .dos import moire_cell_area
+
     nphi = NPHI_1T * B[:, None]                     # (nB, 1)
     nu = gate.density(du)[None, :] / nphi           # (nB, nU)
+    # Two different "fillings". nu is the Landau filling factor and depends
+    # on B; filling_moire counts states per moire cell, is linear in gate
+    # voltage and is B-independent -- it is the natural x-axis for a gate
+    # sweep, running -4 to +4 over the full dU range.
+    filling_moire = gate.density(du) * moire_cell_area()
     total = dos_layer.sum(axis=-1)
 
     cnp = _cnp(du, p)
@@ -98,6 +105,7 @@ def save_dos_map(path, B, du, mu, dos, dos_layer, p, gate, broadening, model):
         "n_m2": gate.density(du),
         "n_cm2": gate.density(du) / 1e4,
         "nu": nu,
+        "filling_moire": filling_moire,
         "nphi_m2": NPHI_1T * B,
         "mu_eV": mu,
         "mu_meV": np.asarray(mu) * 1e3,
@@ -115,7 +123,9 @@ def save_dos_map(path, B, du, mu, dos, dos_layer, p, gate, broadening, model):
             "B_T": "tesla",
             "dU_eV": "eV, total interlayer potential difference u3 - u1",
             "n_m2": "m^-2, carrier density relative to charge neutrality",
-            "nu": "Landau filling factor n*h/(e*B), all four flavours",
+            "nu": "Landau filling factor n*h/(e*B), all four flavours; (nB x nU)",
+            "filling_moire": "states per moire cell, linear in gate voltage "
+                             "and independent of B; (nU,)",
             "mu_eV": "eV, chemical potential, absolute (neutrality = cnp_eV)",
             "cnp_eV": "eV, charge-neutrality energy at each dU -- not zero",
             "dos_m2_eV": "states m^-2 eV^-1, both valleys, spin included",

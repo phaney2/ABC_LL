@@ -641,6 +641,42 @@ def test_density_is_measured_from_the_cnp():
             assert n0 < -1e13, n0 / 1e4
 
 
+def test_cnp_energy_follows_the_model():
+    """The neutrality reference must match the model the levels come from.
+
+    The minimal models have delta = gamma4 = 0, so their neutrality really
+    is E = 0 at every dU; the full model's is +6.3 meV at dU = 0.  Pairing
+    minimal levels with a full-model CNP would offset every filling.
+    """
+    for du in (0.0, 0.1, 0.2, -0.15):
+        assert abs(dos.cnp_energy(du, P, model="six_band_minimal")) < 5e-5
+        assert abs(dos.cnp_energy(du, P, model="two_band_minimal")) < 5e-5
+    assert dos.cnp_energy(0.0, P, model="six_band") > 5e-3
+
+
+def test_minimal_model_layer_fraction_is_even_in_filling():
+    """Carriers sit on the top layer at both electron and hole doping.
+
+    Two symmetries compose to force this.  Inversion maps the layer-resolved
+    DOS of H(-dU) at energy E onto that of H(+dU) at E with the layers
+    reversed; chirality-with-layer-reversal maps top(E) onto bottom(-E) at
+    fixed dU.  Together they send bottom at filling -f to bottom at +f, so
+    every layer fraction is *even* in filling -- not mirrored, which is the
+    easy thing to assume.
+    """
+    gate = dos.moire_gate()
+    br = dos.Broadening(gamma0=1e-3, lineshape="gaussian")
+    pm = P.minimal()
+    for B, du in ((4.0, 0.10), (12.0, 0.18)):
+        _, _, dl_p, _ = dos.fermi_level_and_dos("six_band_minimal", B, du,
+                                                pm, gate, br, layers=True)
+        _, _, dl_m, _ = dos.fermi_level_and_dos("six_band_minimal", B, -du,
+                                                pm, gate, br, layers=True)
+        fp, fm = dl_p / dl_p.sum(), dl_m / dl_m.sum()
+        assert np.allclose(fp, fm, atol=1e-9), (B, du, fp, fm)
+        assert fp[2] > 0.6, (B, du, fp)      # and it is the top layer
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     fail = 0

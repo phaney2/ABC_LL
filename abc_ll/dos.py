@@ -135,7 +135,7 @@ class GateModel:
 
 # ------------------------------------------------------- DOS and filling
 @lru_cache(maxsize=4096)
-def _cnp_cached(du_key, pkey, kmax, nk, nth):
+def _cnp_cached(du_key, pkey, kmax, nk, nth, model):
     from . import bands
     from .params import ABCParams
 
@@ -147,13 +147,13 @@ def _cnp_cached(du_key, pkey, kmax, nk, nth):
     ky = np.outer(k, np.sin(th))
     ev, ec = -np.inf, np.inf
     for xi in (+1, -1):
-        lo, hi = bands.low_energy_pair("six_band", kx, ky, du, p, valley=xi)
+        lo, hi = bands.low_energy_pair(model, kx, ky, du, p, valley=xi)
         ev = max(ev, float(lo.max()))
         ec = min(ec, float(hi.min()))
     return 0.5 * (ev + ec)
 
 
-def cnp_energy(du, p, kmax=0.40, nk=1200, nth=121):
+def cnp_energy(du, p, kmax=0.40, nk=1200, nth=121, model="six_band"):
     """Charge-neutrality energy at interlayer potential ``du`` [eV].
 
     **E = 0 is not charge neutrality.**  The ABC chain is bipartite under
@@ -174,10 +174,17 @@ def cnp_energy(du, p, kmax=0.40, nk=1200, nth=121):
     The offset is bounded -- at most ~1e11 cm^-2, 2% of full scale here --
     and vanishes once the gap is wide enough to contain E = 0, which happens
     by |du| ~ 20 meV.  But that strip is where the zero-mode multiplet lives.
+
+    ``model`` must match the model the levels come from.  The minimal
+    models have delta = gamma4 = 0, so their neutrality really is E = 0;
+    pairing minimal levels with a full-model CNP would offset every filling
+    by ~6 meV worth of density.
     """
+    if model.startswith("two_band"):
+        model = "six_band_minimal" if model.endswith("minimal") else "six_band"
     pkey = (p.gamma0, p.gamma1, p.gamma2, p.gamma3, p.gamma4, p.delta,
             p.a, p.d0)
-    return _cnp_cached(int(round(float(du) * 1e9)), pkey, kmax, nk, nth)
+    return _cnp_cached(int(round(float(du) * 1e9)), pkey, kmax, nk, nth, model)
 
 
 def dos(mu, levels, B, broadening: Broadening, g_spin=2):
@@ -333,7 +340,7 @@ def fermi_level_and_dos(model, B, du, p, gate: GateModel,
     back as ``cnp_energy(du, p)``, not zero.
     """
     n_target = gate.density(du)
-    e0 = cnp_energy(du, p)        # charge neutrality is NOT at E = 0
+    e0 = cnp_energy(du, p, model=model)   # neutrality is NOT at E = 0
     pad = max(0.02, 12.0 * float(broadening.width(B)))
     reach = max(e_hi0, pad)
     # n(mu) is monotonic and vanishes at e0, so sign(mu - e0) ==

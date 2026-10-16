@@ -1,0 +1,20 @@
+# Generated data: large (ll_vs_nu.mat alone is 75 MB) and fully
+# reproducible from the scripts. Regenerate with:
+#   python3 scripts/dos_map.py
+#   python3 scripts/export_levels.py
+#   python3 scripts/add_cnp_to_mat.py
+data/
+
+# Generated figures, likewise:
+#   python3 scripts/plot_spectra.py
+#   python3 scripts/dos_map.py
+figures/
+
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# MATLAB
+*.asv
+*.mex*
+slprj/

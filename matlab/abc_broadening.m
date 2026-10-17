@@ -27,7 +27,7 @@ function br = abc_broadening()
 %                        BROADENING PARAMETERS
 % ======================================================================
 
-br.gamma0    = 1.0e-4;        % eV at 1 T   <-- main knob
+br.gamma0    = 1.0e-6;        % eV at 1 T   <-- main knob
 br.scaling   = 'sqrtB';       % 'sqrtB' | 'const'
 br.lineshape = 'gaussian';    % 'gaussian' | 'lorentzian'
 

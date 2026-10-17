@@ -317,6 +317,56 @@ That second one has two traps worth knowing about, both found the hard way:
   `test_fast_solver_matches_eigenvector_solver` demonstrates exact agreement
   over 24 cases and a 442-point grid scan found zero mismatches.
 
+## Why the Landau fan lines are straight
+
+A natural worry: the Hamiltonian varies drastically with gate voltage (dU
+runs over 400 meV across these maps), so the fan lines ought to warp away
+from straight.  They do not, and the reason is worth stating because it is
+more general than it first looks.
+
+**Gaps sit at integer filling, whatever the Hamiltonian is doing.**  A
+Landau level holds `e*B/h` states per unit area regardless of the
+dispersion, so "k levels filled" means `n = 2k * e*B/h` -- a straight line
+through the origin of the (n, B) plane.  This is the Streda relation and it
+is insensitive to the band structure entirely.  Measured over 405 gaps
+spanning B = 2-12 T and dU = 20-200 meV in `six_band_minimal`, every gap
+centre lands on an even integer `nu` with deviation **exactly zero**.
+
+So the dU dependence of the Hamiltonian cannot bend a fan line.  What it
+controls instead is *which* `nu` are gapped and *how wide* the gaps are:
+
+```
+  nu   gaps   min    median    max      (gap width, meV)
+   6     42   2.02     3.73   17.52
+  10     44   2.05     4.02   19.44
+  14     43   2.00     6.95   19.54
+```
+
+A tenfold spread in width at fixed `nu`, and lines that come and go: at
+B = 8 T, dU = 50 meV there are gaps at nu = 8, 10, 12, 14, 16, 18, but at
+dU = 120 meV only nu = 6 and 16 survive.  Level crossings terminate a line;
+they never bend it.
+
+**The second reason is an assumption, not physics.**  These maps impose
+`n = kappa * dU` exactly, so the gate-voltage-to-density step is linear by
+construction.  In a real device it is not -- gate charge splits between
+adding carriers and raising E_F (quantum capacitance), which is the
+mechanism that would warp a fan in the (V_gate, B) plane.  For this
+geometry it is negligible: crossing a 10 meV gap costs ~10 mV out of a
+~72 V sweep for a 300 nm oxide, about 0.01%.  A thin top gate, or a much
+lower DOS, would make it visible.
+
+**What is actually missing is the moire.**  Streda lines emanate from
+*every* B = 0 gap, not only charge neutrality.  A real ABC/hBN sample has
+moire band gaps at filling +-4, which launch their own fans from
+(filling = +-4, B = 0) -- the satellite fans characteristic of these
+systems -- plus Hofstadter structure at higher flux.  This model has only
+the dU-induced gap at filling 0, so every line radiates from a single
+origin.  That is a direct consequence of treating the sample as weakly
+perturbed ABC, and it is the main qualitative feature the model cannot
+produce.
+
+
 ## Physics worth knowing before trusting a plot
 
 * The zero-mode multiplet is 12-fold (3 orbital x 2 spin x 2 valley), and a

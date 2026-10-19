@@ -367,6 +367,95 @@ perturbed ABC, and it is the main qualitative feature the model cannot
 produce.
 
 
+## Semiclassical Onsager fan
+
+An independent route to the same spectrum: trace constant-energy orbits at
+B = 0 and quantize their areas, instead of diagonalizing in a Landau basis.
+The machinery is the engine in `hofstadter/source_code/semiclassical`, which is
+otherwise driven by a moire bilayer.  Nothing in that tree is modified --
+`abc_ll.semiclassical.engine()` imports `isoenergy.get_energy_resolved_data`
+and `onsager.onsager_fan_band` and calls them directly, which is its documented
+post-processing API.  Point `ABC_SEMICLASSICAL_DIR` elsewhere if the engine
+moves.
+
+```
+python3 scripts/export_semiclassical.py six_band    # -> data/semiclassical_six_band.mat
+python3 scripts/compare_semiclassical.py six_band   # score against exact levels
+matlab -batch "addpath('matlab'); plot_semiclassical"
+```
+
+The condition solved is
+
+```
+S(E)/(2 pi)^2 = (|B|/phi0) * [ (n + 1/2) - sign(B)*Phi_B/(2 pi) - (dL/dE)/(2 pi) ]
+```
+
+with no susceptibility term.  Levels come out cumulatively as `_S` (area only),
+`_SB` (+ Berry phase) and `_SBM` (+ orbital moment).
+
+### Read `_SBM`
+
+Scored against the exact levels, as a fraction of the local level spacing,
+split by Landau index (the lowest three on each side of neutrality are dropped
+-- the zero-mode multiplet is not a semiclassical object):
+
+| model | term | index 3-7 | index 8+ |
+|---|---|---|---|
+| `six_band` | S | 0.336 | 0.221 |
+| `six_band` | SB | 0.302 | 0.316 |
+| `six_band` | **SBM** | 0.256 | **0.043** |
+| `six_band_minimal` | **SBM** | 0.113 | **0.061** |
+| `two_band_minimal` | S | 0.351 | 0.551 |
+| `two_band_minimal` | SB | 0.149 | 0.230 |
+| `two_band_minimal` | **SBM** | 0.094 | **0.059** |
+
+The index split is the whole story.  Semiclassics is an expansion in 1/n, so a
+correct treatment must get *better* with index.  Only `SBM` does: 0.26 -> 0.04
+for the full model.  `S` barely moves and `SB` does not improve at all.  The
+Berry phase and the orbital moment are both first order in B and are not
+alternatives -- taking one without the other leaves an error that does not
+vanish at large n, which is why `_SB` scores no better asymptotically than
+bare Onsager despite looking better on a lumped average.
+
+### Three things that had to be got right
+
+**`Bmultiplier = 1`, not the engine's default of 4.**  That 4 is an untraced
+empirical factor tied to the Hofstadter flux convention (`doc_technical.md`,
+"The Bmultiplier factor").  There is no moire cell here, so the textbook value
+applies.  It is checkable: for the minimal two-band model at dU = 0,
+`E = (hbar v k)^3/gamma1^2` gives `S = pi k^2`, and with the chirality-3 Berry
+phase `3 pi` the condition yields `E_n ∝ (n-1)^(3/2)` against the exact
+`sqrt(n(n-1)(n-2))` -- agreeing to 0.35% by n = 13.  At `Bmultiplier = 4` every
+energy is out by `4^(3/2) = 8`.  `tests/test_semiclassical.py` pins both.
+
+**`vol_M` is a normalization handle, not a cell area.**  The engine uses it only
+through `cell_area = (2 pi)^2/(vol_M nk1 nk2)`.  With a uniform patch we set
+`vol_M = (2 pi)^2/(nk1 nk2 dk^2)`.  The mesh must therefore be **isotropic**:
+`isoenergy._shoelace_area` works in grid-index coordinates and applies one
+`cell_area`, so unequal `dkx`, `dky` would scale every orbit area silently.
+
+**The patch is not a torus**, so contours are traced with `periodic=False` and
+orbits reaching the border are dropped *silently*.  The patch is sized at
+`hbar v k = 0.50 eV` because the worst case in the dU grid -- the 160 meV orbit
+at dU = 200 meV -- reaches 0.4002, and a 0.40 patch loses exactly that one.
+
+### Where it does not apply
+
+* **dU = 0.**  A gapless chiral touching has its Berry curvature concentrated
+  in a delta function at the touching point, which no grid sum can see:
+  `enclosedBC` comes out identically zero and `_SB`/`_SBM` collapse to `_S`.
+  Every dU is still computed, but `flux_converged` in the output flags the
+  gapless ones and they must not be read as Berry-corrected.  Recovering this
+  case needs a Wilson loop along the contour rather than a surface integral.
+* **The zero-mode multiplet.**  No orbit-area argument produces the 12-fold
+  level at neutrality; expect the fan to be wrong at the lowest few indices.
+* **Multiple pockets.**  `onsager_fan_band` quantizes only the largest orbit,
+  but a Mexican-hat band has a second one and trigonal warping adds satellites
+  below the Lifshitz energy.  The exporter calls the engine once per pocket
+  column and tags the output `_p0`, `_p1` -- extra calls, not a change to the
+  engine.
+
+
 ## Physics worth knowing before trusting a plot
 
 * The zero-mode multiplet is 12-fold (3 orbital x 2 spin x 2 valley), and a

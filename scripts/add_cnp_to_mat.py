@@ -40,8 +40,11 @@ def stamp(name):
     m = loadmat(path, squeeze_me=False, struct_as_record=True)
     m = {k: v for k, v in m.items() if not k.startswith("__")}
 
+    model = str(np.squeeze(m.get("model", "six_band")))
+    p_use = P.minimal() if model.endswith("minimal") else P
     du = np.atleast_1d(np.squeeze(m["dU_eV"]))
-    flat = np.array([dos.cnp_energy(float(x), P) for x in du.ravel()])
+    flat = np.array([dos.cnp_energy(float(x), p_use, model=model)
+                     for x in du.ravel()])
     cnp = flat.reshape(du.shape)
     m["cnp_eV"] = cnp
     m["cnp_meV"] = cnp * 1e3
@@ -50,11 +53,11 @@ def stamp(name):
         if "cnp_eV" not in txt:
             m["readme"] = txt + NOTE
     savemat(path, m, do_compression=True)
-    print(f"  {name}: cnp_eV {cnp.shape}, "
+    print(f"  {name}: model={model}, cnp_eV {cnp.shape}, "
           f"{cnp.min()*1e3:+.3f} to {cnp.max()*1e3:+.3f} meV")
 
 
 if __name__ == "__main__":
-    for f in ("dos_map_120x300.mat", "ll_vs_B.mat", "ll_vs_dU.mat",
-              "ll_grid.mat", "ll_vs_nu.mat"):
-        stamp(f)
+    import glob
+    for path in sorted(glob.glob(os.path.join(CACHE, "*.mat"))):
+        stamp(os.path.basename(path))

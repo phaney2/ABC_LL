@@ -18,3 +18,5 @@ __pycache__/
 *.asv
 *.mex*
 slprj/
+_signtest.py
+data/*.log

@@ -16,8 +16,13 @@ from scipy.io import savemat
 from .params import ABCParams, NPHI_1T
 
 
-def _cnp(du, p):
+def _cnp(du, p, model):
     """Charge-neutrality energy for each dU, same shape as ``du``.
+
+    ``model`` matters: the minimal and two-band models have no delta or
+    gamma4, so their neutrality is exactly E = 0, while the full model's
+    runs +6.3 to +14.8 meV. Defaulting to the full model here would offset
+    every filling derived from a minimal-model file.
 
     Imported lazily to keep this module free of a hard dependency on the
     DOS machinery.  Neutrality is **not** at E = 0 -- see `dos.cnp_energy`
@@ -27,7 +32,7 @@ def _cnp(du, p):
     from .dos import cnp_energy
 
     du = np.asarray(du, float)
-    flat = np.array([cnp_energy(float(x), p) for x in du.ravel()])
+    flat = np.array([cnp_energy(float(x), p, model=model) for x in du.ravel()])
     return flat.reshape(du.shape)
 
 
@@ -94,7 +99,7 @@ def save_dos_map(path, B, du, mu, dos, dos_layer, p, gate, broadening, model):
     filling_moire = gate.density(du) * moire_cell_area()
     total = dos_layer.sum(axis=-1)
 
-    cnp = _cnp(du, p)
+    cnp = _cnp(du, p, model)
     out = {
         "model": model,
         "B_T": B,
@@ -172,7 +177,7 @@ def save_levels_nu(path, B, nu, du2d, levels, layer_weight, valley, p, gate,
             W[i, j, :k, :] = layer_weight[i][j]
             V[i, j, :k] = valley[i][j]
 
-    cnp = _cnp(du2d, p)
+    cnp = _cnp(du2d, p, model)
     out = {
         "model": model,
         "B_T": B,
@@ -212,7 +217,8 @@ def save_levels_nu(path, B, nu, du2d, levels, layer_weight, valley, p, gate,
     return path
 
 
-def save_levels(path, B, du, levels, layer_weight, p, model, extra=None):
+def save_levels(path, B, du, levels, layer_weight, p, model, extra=None,
+                gate=None):
     """Write raw Landau levels on a (B, dU) grid, NaN-padded.
 
     ``levels`` is a nested list indexed ``[iB][iU]`` of 1-D energy arrays
@@ -237,7 +243,7 @@ def save_levels(path, B, du, levels, layer_weight, p, model, extra=None):
             if W is not None:
                 W[i, j, :k, :] = layer_weight[i][j]
 
-    cnp = _cnp(du, p)
+    cnp = _cnp(du, p, model)
     out = {
         "model": model,
         "B_T": B,
@@ -263,6 +269,12 @@ def save_levels(path, B, du, levels, layer_weight, p, model, extra=None):
     }
     if W is not None:
         out["layer_weight"] = W
+    if gate is not None:
+        # lets the reader turn dU into density, gate voltage and filling
+        out["gate"] = gate_struct(gate)
+        out["n_m2"] = gate.density(du)
+        out["n_cm2"] = gate.density(du) / 1e4
+        out["filling_moire"] = 4.0 * np.asarray(du, float) / gate.du_max
     if extra:
         out.update(extra)
     savemat(str(path), out, do_compression=True)

@@ -28,9 +28,11 @@ addpath(here);
 % ======================================================================
 
 MODEL_TAG = getenv('ABC_MODEL');
-if isempty(MODEL_TAG), MODEL_TAG = 'six_band_minimal'; end
+% if isempty(MODEL_TAG), MODEL_TAG = 'six_band_minimal'; end
+if isempty(MODEL_TAG), MODEL_TAG = 'six_band'; end
 GRID_TAG  = getenv('ABC_GRID');
-if isempty(GRID_TAG),  GRID_TAG  = '100x241'; end
+% if isempty(GRID_TAG),  GRID_TAG  = '100x241'; end
+if isempty(GRID_TAG),  GRID_TAG  = '180x301'; end
 
 datafile = fullfile(here, '..', 'data', ...
                     ['dos_map_' MODEL_TAG '_' GRID_TAG '.mat']);
@@ -45,7 +47,7 @@ datafile = fullfile(here, '..', 'data', ...
 NORMALISE_ROWS = true;
 CLIM_PCT  = [2 98];
 LOG_SCALE = false;
-NU_LINES  = [-24 -16 -12 -8 -4 4 8 12 16 24];   % constant-nu guides
+NU_LINES  = [-22 -18 -14 -10 -6 6 10 14 18 22];   % constant-nu guides
 SHOW_EXTRA = true;     % second figure: Fermi level and top-layer fraction
 % ======================================================================
 

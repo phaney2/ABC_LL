@@ -180,7 +180,7 @@ def cnp_energy(du, p, kmax=0.40, nk=1200, nth=121, model="six_band"):
     pairing minimal levels with a full-model CNP would offset every filling
     by ~6 meV worth of density.
     """
-    if model.startswith("two_band"):
+    if model.startswith("two_band_folded"):
         model = "six_band_minimal" if model.endswith("minimal") else "six_band"
     pkey = (p.gamma0, p.gamma1, p.gamma2, p.gamma3, p.gamma4, p.delta,
             p.a, p.d0)
@@ -311,7 +311,7 @@ def dos_layers(mu, levels, layer_weight, B, broadening: Broadening, g_spin=2):
 def fermi_level_and_dos(model, B, du, p, gate: GateModel,
                         broadening: Broadening, g_spin=2, e_hi0=0.14,
                         max_grow=5, margin=0.02, valleys=(+1, -1),
-                        layers=False):
+                        layers=False, e_max=0.45):
     """Chemical potential and DOS(E_F) at one (B, dU), at fixed gate voltage.
 
     The density is set by the gate and does **not** move with B; the chemical
@@ -361,13 +361,23 @@ def fermi_level_and_dos(model, B, du, p, gate: GateModel,
             dl = (dos_layers(mu, lv, lw, B, broadening, g_spin)
                   if layers else None)
             return mu, float(dos(mu, lv, B, broadening, g_spin)), dl, (lo, hi)
+        # Bounded growth.  Unbounded, this reaches ~1.8 eV in five steps,
+        # and the basis needed to represent that at low field is large
+        # enough to get the worker OOM-killed -- which surfaces as an
+        # inscrutable BrokenProcessPool rather than an error anyone can act
+        # on.  Fail loudly at e_max instead.
         if electrons:
-            hi = hi * 1.6 + pad
+            hi = min(hi * 1.6 + pad, e_max)
         else:
-            lo = lo * 1.6 - pad
+            lo = max(lo * 1.6 - pad, -e_max)
+        if hi >= e_max and lo <= -e_max:
+            break
     raise RuntimeError(
         f"{model} at B={B} T, dU={du} eV: Fermi level did not settle inside "
-        f"[{lo:.3f}, {hi:.3f}] eV (n_target={n_target/1e4:.3e} cm^-2).")
+        f"[{lo:.3f}, {hi:.3f}] eV (n_target={n_target/1e4:.3e} cm^-2, "
+        f"nu={n_target/nphi(B):.1f}). At low field and large |dU| the "
+        f"filling is huge and E_F runs off the top of the band window; "
+        f"raise e_max, or raise the minimum field.")
 
 
 def cnp_shift(levels, B, broadening: Broadening, g_spin=2, window=0.3):
